@@ -30,40 +30,36 @@ python3 -m nvflare_controller.app
 - 控制面板: http://localhost:8080
 - API 状态: http://localhost:8080/api/v1/status
 
-## API 端点
-
-### 服务状态
-- `GET /api/v1/status` - 获取所有服务状态
+## 控制面板功能
 
 ### Dashboard 管理
-- `POST /api/v1/dashboard/start` - 启动 Dashboard
-- `POST /api/v1/dashboard/stop` - 停止 Dashboard
-- `GET /api/v1/dashboard/status` - Dashboard 状态
+- 启动/停止 Dashboard
+- 查看运行状态和 PID
 
-### POC 管理
-- `POST /api/v1/poc/prepare` - 准备 POC 环境
-- `POST /api/v1/poc/start` - 启动 POC
-- `POST /api/v1/poc/stop` - 停止 POC（同时停止 Server 和所有 Clients）
-- `GET /api/v1/poc/status` - POC 状态
+### POC 环境管理
+-准备 POC 环境（prepare）
+- 启动 POC（start）
+- 停止 POC（stop）- 同时关闭 Server 和所有 Clients
 
 ### Server/Client 管理
-- `POST /api/v1/poc/server/start` - 启动 Server
-- `POST /api/v1/poc/server/stop` - 停止 Server
-- `POST /api/v1/poc/clients` - 添加 Client（组织默认为 nvidia）
-- `POST /api/v1/poc/clients/<name>/start` - 启动 Client
-- `POST /api/v1/poc/clients/<name>/stop` - 停止 Client
-- `POST /api/v1/poc/clients/start-n` - 启动 N 个 Client
-- `POST /api/v1/poc/clients/stop-all` - 停止所有 Client
+- 独立启动/停止 Server
+- 添加新 Client（组织默认为 nvidia）
+- 独立启动/停止单个 Client
+- 启动 N 个 Client
+- 停止所有 Client
 
-### Jobs
-- `GET /api/v1/jobs` - 获取 Job 列表
-- `POST /api/v1/jobs` - 提交 Job (multipart/form-data)
-- `GET /api/v1/jobs/<job_id>/log` - 获取 Job 日志
-- `POST /api/v1/jobs/<job_id>/abort` - 中止 Job
+### Job 管理
+- 上传 Job ZIP 文件提交
+- 查看 Job 列表
+- 获取 Job 日志
+- 中止运行中的 Job
 
 ### 设置
-- `GET /api/v1/settings` - 获取配置
-- `POST /api/v1/settings` - 保存配置
+- 配置 Dashboard 端口
+- 配置登录凭证（邮箱/密码/组织）
+- 配置 NVFlare 源码路径
+- 配置 Python 解释器路径
+- 配置 POC 工作目录
 
 ## 配置
 
@@ -91,17 +87,24 @@ python3 -m nvflare_controller.app
 
 ## 技术架构
 
-### Job 提交方式
+### 底层实现
 
-使用 NVFlare CLI 而非 REST API：
-- `nvflare job submit -j <job.zip>` - 提交 Job（自动解压 zip）
-- `nvflare job list` - 列出 Jobs
-- `nvflare job abort --force <job_id>` - 中止 Job
+全部使用 NVFlare CLI 命令，不依赖 Dashboard REST API：
+
+| 功能 | CLI 命令 |
+|------|----------|
+| 准备 POC | `nvflare poc prepare -n <num> --force` |
+| 启动 POC | `nvflare poc start --no-wait` |
+| 停止 POC | `nvflare poc stop --no-wait` |
+| 添加 Client | `nvflare poc add-site <name> --org <org>` |
+| 提交 Job | `nvflare job submit -j <folder>` |
+| 列出 Jobs | `nvflare job list` |
+| 中止 Job | `nvflare job abort --force <job_id>` |
 
 ### 进程管理
 
 - Dashboard: 通过 `python -m nvflare.dashboard.application` 启动
-- POC/Server/Client: 通过 `nvflare poc` 系列命令管理
+- Server/Client: 直接调用 startup.sh 脚本
 - 凭证变化时自动重置数据库
 
 ### 前端特性
@@ -123,11 +126,4 @@ nvflare_controller/
     ├── poc.py          # POC/Server/Client 管理
     ├── jobs.py         # Job 管理
     └── settings.py     # 设置
-```
-
-## 上传 GitHub
-
-```bash
-cd /Users/h/Desktop/testPlugin/nvflare-controller
-gh repo create nvflare-controller --public --source=. --push
 ```
