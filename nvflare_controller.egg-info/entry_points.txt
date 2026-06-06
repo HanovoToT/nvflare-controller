@@ -1,0 +1,2 @@
+[console_scripts]
+nvflare-controller = nvflare_controller.app:main

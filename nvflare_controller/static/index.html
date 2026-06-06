@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVFlare Controller</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header {
+            background: linear-gradient(135deg, #76b900 0%, #007a33 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+            border-bottom: 2px solid #76b900;
+            padding-bottom: 10px;
+        }
+        .btn {
+            background: #76b900;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .btn:hover { background: #669900; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .status-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .status-item h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
+        .status-item .value { font-size: 20px; font-weight: 600; }
+        .status-running { color: #28a745; }
+        .status-stopped { color: #dc3545; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+            max-width: 300px;
+        }
+        .clients-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .clients-table th, .clients-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .clients-table th { background: #f8f9fa; font-weight: 600; }
+        .log-content {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow: auto;
+        }
+        .nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav a {
+            color: #007a33;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            background: white;
+            border: 1px solid #ddd;
+        }
+        .nav a:hover { background: #f0f7e6; }
+        .nav a.active { background: #76b900; color: white; border-color: #76b900; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>NVFlare Controller</h1>
+            <p>NVFlare Dashboard / POC / Server / Client 管理控制台</p>
+        </div>
+
+        <div id="message-container"></div>
+
+        <div class="nav">
+            <a href="#" class="active" onclick="showTab('dashboard')">Dashboard</a>
+            <a href="#" onclick="showTab('poc')">POC 环境</a>
+            <a href="#" onclick="showTab('jobs')">任务管理</a>
+            <a href="#" onclick="showTab('settings')">设置</a>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="card">
+                <h2>Dashboard 管理</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <h3>状态</h3>
+                        <div class="value" id="dashboard-status">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>PID</h3>
+                        <div class="value" id="dashboard-pid">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>端口</h3>
+                        <div class="value" id="dashboard-port">-</div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="startDashboard()">启动 Dashboard</button>
+                    <button class="btn btn-danger" onclick="stopDashboard()">停止 Dashboard</button>
+                    <button class="btn btn-secondary" onclick="refreshStatus()">刷新状态</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- POC Tab -->
+        <div id="tab-poc" class="tab-content">
+            <div class="card">
+                <h2>POC 环境</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <h3>Server 状态</h3>
+                        <div class="value" id="server-status">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>Client 数量</h3>
+                        <div class="value" id="client-count">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h3>运行中的 Client</h3>
+                        <div class="value" id="running-clients">-</div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="preparePoc()">准备环境 (2 Clients)</button>
+                    <button class="btn" onclick="startPoc()">启动 POC</button>
+                    <button class="btn btn-danger" onclick="stopPoc()">停止 POC</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Server 管理</h2>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="startServer()">启动 Server</button>
+                    <button class="btn btn-danger" onclick="stopServer()">停止 Server</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>客户端管理</h2>
+                <div class="form-group">
+                    <label>启动 N 个最新 Client:</label>
+                    <input type="number" id="client-count-input" value="2" min="1" max="20" style="width: 80px;">
+                    <button class="btn" onclick="startClientsN()">启动</button>
+                    <button class="btn btn-danger" onclick="stopAllClients()">停止全部</button>
+                </div>
+                <div class="form-group">
+                    <label>添加新 Client:</label>
+                    <input type="text" id="new-client-name" placeholder="客户端名称" style="width: 150px;">
+                    <input type="text" id="new-client-org" placeholder="组织(默认nvidia)" style="width: 150px;">
+                    <button class="btn" onclick="addClient()">添加</button>
+                </div>
+                <h3 style="margin-top: 20px; font-size: 16px;">Client 列表</h3>
+                <div id="clients-container">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jobs Tab -->
+        <div id="tab-jobs" class="tab-content">
+            <div class="card">
+                <h2>提交任务</h2>
+                <div class="form-group">
+                    <input type="file" id="job-file" accept=".zip" style="display: none;" onchange="handleJobFile(this)">
+                    <button class="btn" onclick="document.getElementById('job-file').click()">选择 Job ZIP 文件</button>
+                    <span id="selected-job-name"></span>
+                    <button class="btn" id="submit-job-btn" disabled onclick="submitJob()">提交</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>任务列表</h2>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn" onclick="refreshJobs()">刷新</button>
+                    <button class="btn btn-danger" onclick="deleteSelectedJobs()">删除选中</button>
+                    <span id="selected-count" style="margin-left: 10px; color: #666;"></span>
+                </div>
+                <div id="jobs-container">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="tab-content">
+            <div class="card">
+                <h2>系统设置</h2>
+                <div class="form-group">
+                    <label>Dashboard 端口:</label>
+                    <input type="number" id="setting-dashboard-port" style="width: 100px;">
+                </div>
+                <div class="form-group">
+                    <label>登录邮箱:</label>
+                    <input type="email" id="setting-email" placeholder="admin@example.com">
+                </div>
+                <div class="form-group">
+                    <label>登录密码:</label>
+                    <input type="password" id="setting-password" placeholder="123456">
+                </div>
+                <div class="form-group">
+                    <label>组织:</label>
+                    <input type="text" id="setting-org" placeholder="org" style="width: 100px;">
+                </div>
+                <div class="form-group">
+                    <label>NVFlare 源码路径:</label>
+                    <input type="text" id="setting-nvflare-path" placeholder="/path/to/nvflare">
+                </div>
+                <div class="form-group">
+                    <label>Python 可执行文件:</label>
+                    <input type="text" id="setting-python-exe" placeholder="/usr/bin/python3">
+                </div>
+                <div class="form-group">
+                    <label>POC 工作区:</label>
+                    <input type="text" id="setting-poc-workspace" placeholder="/tmp/nvflare/poc">
+                </div>
+                <button class="btn" onclick="saveSettings()">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let selectedJobFile = null;
+
+        function showMessage(msg, isError = false) {
+            const container = document.getElementById('message-container');
+            container.innerHTML = '<div class="' + (isError ? 'error' : 'success') + '">' + msg + '</div>';
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav a').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+            localStorage.setItem('activeTab', tabName);
+        }
+
+        function restoreTab() {
+            const lastTab = localStorage.getItem('activeTab') || 'dashboard';
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav a').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + lastTab).classList.add('active');
+            document.querySelectorAll('.nav a').forEach(el => {
+                if (el.textContent.includes(lastTab === 'poc' ? 'POC' : lastTab === 'dashboard' ? 'Dashboard' : lastTab === 'jobs' ? '任务' : '设置')) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        async function apiCall(method, path, body = null) {
+            try {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const resp = await fetch(API_BASE + path, options);
+                return await resp.json();
+            } catch (e) {
+                return { status: 'error', message: e.message };
+            }
+        }
+
+        // Dashboard
+        async function refreshStatus() {
+            const data = await fetch(API_BASE + '/status').then(r => r.json());
+            if (data.status !== 'ok') return;
+
+            const ds = data.dashboard;
+            document.getElementById('dashboard-status').textContent = ds.running ? '运行中' : '已停止';
+            document.getElementById('dashboard-status').className = 'value ' + (ds.running ? 'status-running' : 'status-stopped');
+            document.getElementById('dashboard-pid').textContent = ds.pid || '-';
+            document.getElementById('dashboard-port').textContent = data.config.dashboard_port;
+
+            const ps = data.poc;
+            document.getElementById('server-status').textContent = ps.server.running ? '运行中' : '已停止';
+            document.getElementById('server-status').className = 'value ' + (ps.server.running ? 'status-running' : 'status-stopped');
+            document.getElementById('client-count').textContent = ps.clients.length;
+            document.getElementById('running-clients').textContent = ps.clients.filter(c => c.running).length;
+
+            // Clients table
+            const container = document.getElementById('clients-container');
+            if (ps.clients.length === 0) {
+                container.innerHTML = '<p>暂无客户端</p>';
+            } else {
+                let html = '<table class="clients-table"><thead><tr><th>名称</th><th>状态</th><th>PID</th><th>创建时间</th><th>操作</th></tr></thead><tbody>';
+                ps.clients.forEach(c => {
+                    html += '<tr>';
+                    html += '<td>' + c.name + '</td>';
+                    html += '<td><span class="' + (c.running ? 'status-running' : 'status-stopped') + '">' + (c.running ? '运行中' : '已停止') + '</span></td>';
+                    html += '<td>' + (c.pid || '-') + '</td>';
+                    html += '<td>' + (c.created || '-') + '</td>';
+                    html += '<td>';
+                    if (c.running) {
+                        html += '<button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="stopClient(\'' + c.name + '\')">停止</button>';
+                    } else {
+                        html += '<button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="startClient(\'' + c.name + '\')">启动</button>';
+                    }
+                    html += '</td></tr>';
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+        }
+
+        async function startDashboard() {
+            const result = await apiCall('POST', '/dashboard/start');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        async function stopDashboard() {
+            const result = await apiCall('POST', '/dashboard/stop');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        // POC
+        async function preparePoc() {
+            if (!confirm('确定要重置 POC 环境吗？这将清除所有现有数据。')) return;
+            const result = await apiCall('POST', '/poc/prepare', { num_clients: 2 });
+            showMessage(result.message || result.status, result.status !== 'ok');
+            setTimeout(refreshStatus, 2000);
+        }
+
+        async function startPoc() {
+            const result = await apiCall('POST', '/poc/start');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 2000);
+        }
+
+        async function stopPoc() {
+            const result = await apiCall('POST', '/poc/stop');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 2000);
+        }
+
+        async function startServer() {
+            const result = await apiCall('POST', '/poc/server/start');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 2000);
+        }
+
+        async function stopServer() {
+            const result = await apiCall('POST', '/poc/server/stop');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        async function startClientsN() {
+            const count = parseInt(document.getElementById('client-count-input').value) || 2;
+            const result = await apiCall('POST', '/poc/clients/start-n', { count });
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 2000);
+        }
+
+        async function stopAllClients() {
+            if (!confirm('确定要停止所有客户端吗？')) return;
+            const result = await apiCall('POST', '/poc/clients/stop-all');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        async function addClient() {
+            const name = document.getElementById('new-client-name').value.trim();
+            const org = 'nvidia';
+            if (!name) { showMessage('请输入客户端名称', true); return; }
+            const result = await apiCall('POST', '/poc/clients', { name, org });
+            showMessage(result.message || result.status, result.status !== 'ok');
+            if (result.status === 'ok') {
+                document.getElementById('new-client-name').value = '';
+                setTimeout(refreshStatus, 2000);
+            }
+        }
+
+        async function startClient(name) {
+            const result = await apiCall('POST', '/poc/clients/' + encodeURIComponent(name) + '/start');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        async function stopClient(name) {
+            if (!confirm('确定要停止客户端 ' + name + ' 吗？')) return;
+            const result = await apiCall('POST', '/poc/clients/' + encodeURIComponent(name) + '/stop');
+            showMessage(result.message || result.status);
+            setTimeout(refreshStatus, 1000);
+        }
+
+        // Jobs
+        let selectedJobIds = [];
+
+        async function refreshJobs() {
+            const data = await apiCall('GET', '/jobs');
+            const container = document.getElementById('jobs-container');
+            if (data.status !== 'ok' || !data.jobs) {
+                container.innerHTML = '<div class="error">加载失败</div>';
+                return;
+            }
+            if (data.jobs.length === 0) {
+                container.innerHTML = '<p>暂无任务</p>';
+                return;
+            }
+            data.jobs.sort((a, b) => new Date(b.submit_time || 0) - new Date(a.submit_time || 0));
+            let html = '<table class="clients-table"><thead><tr><th><input type="checkbox" onchange="toggleSelectAll(this)"></th><th>任务ID</th><th>名称</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody>';
+            data.jobs.forEach(j => {
+                html += '<tr>';
+                html += '<td><input type="checkbox" class="job-checkbox" value="' + j.job_id + '" onchange="updateSelectedCount()"></td>';
+                html += '<td>' + j.job_id + '</td>';
+                html += '<td>' + (j.name || 'Unknown') + '</td>';
+                html += '<td>' + j.status + '</td>';
+                html += '<td>' + (j.submit_time || '-') + '</td>';
+                html += '<td><button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="viewJobLog(\'' + j.job_id + '\')">日志</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function handleJobFile(files) {
+            if (files.length > 0) {
+                selectedJobFile = files[0];
+                document.getElementById('selected-job-name').textContent = selectedJobFile.name;
+                document.getElementById('submit-job-btn').disabled = false;
+            }
+        }
+
+        async function submitJob() {
+            if (!selectedJobFile) return;
+            const formData = new FormData();
+            formData.append('job', selectedJobFile);
+            try {
+                const resp = await fetch(API_BASE + '/jobs', { method: 'POST', body: formData });
+                const result = await resp.json();
+                showMessage(result.message || result.status, result.status !== 'ok');
+                if (result.status === 'ok') {
+                    selectedJobFile = null;
+                    document.getElementById('selected-job-name').textContent = '';
+                    document.getElementById('submit-job-btn').disabled = true;
+                    document.getElementById('job-file').value = '';
+                    refreshJobs();
+                }
+            } catch (e) {
+                showMessage('提交失败: ' + e.message, true);
+            }
+        }
+
+        async function viewJobLog(jobId) {
+            const result = await apiCall('GET', '/jobs/' + jobId + '/log');
+            if (result.status === 'ok') {
+                alert(result.log || '无日志');
+            } else {
+                showMessage(result.message || '获取日志失败', true);
+            }
+        }
+
+        function toggleSelectAll(source) {
+            document.querySelectorAll('.job-checkbox').forEach(cb => cb.checked = source.checked);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const checked = document.querySelectorAll('.job-checkbox:checked');
+            document.getElementById('selected-count').textContent = checked.length > 0 ? '已选中 ' + checked.length + ' 个' : '';
+        }
+
+        async function deleteSelectedJobs() {
+            const checked = document.querySelectorAll('.job-checkbox:checked');
+            const ids = Array.from(checked).map(cb => cb.value);
+            if (ids.length === 0) { showMessage('请先选择要删除的任务', true); return; }
+            if (!confirm('确定要删除 ' + ids.length + ' 个任务吗？此操作不可恢复。')) return;
+            const result = await apiCall('POST', '/jobs/batch-delete', { job_ids: ids });
+            showMessage(result.message || result.status, result.status !== 'ok');
+            if (result.status === 'ok') refreshJobs();
+        }
+
+        // Settings
+        async function loadSettings() {
+            const data = await apiCall('GET', '/settings');
+            if (data.status === 'ok' && data.settings) {
+                document.getElementById('setting-dashboard-port').value = data.settings.dashboard_port || 8443;
+                document.getElementById('setting-nvflare-path').value = data.settings.nvflare_path || '';
+                document.getElementById('setting-python-exe').value = data.settings.python_exe || '/usr/bin/python3';
+                document.getElementById('setting-poc-workspace').value = data.settings.poc_workspace || '/tmp/nvflare/poc';
+                // Parse credential
+                const cred = (data.settings.credential || 'admin@example.com:123456:org').split(':');
+                document.getElementById('setting-email').value = cred[0] || '';
+                document.getElementById('setting-password').value = cred[1] || '';
+                document.getElementById('setting-org').value = cred[2] || '';
+            }
+        }
+
+        async function saveSettings() {
+            if (!confirm('确定要保存设置吗？修改凭证后需要重启 Dashboard 才能生效。')) return;
+
+            const email = document.getElementById('setting-email').value;
+            const password = document.getElementById('setting-password').value;
+            const org = document.getElementById('setting-org').value;
+            const credential = `${email}:${password}:${org}`;
+            const settings = {
+                dashboard_port: parseInt(document.getElementById('setting-dashboard-port').value) || 8443,
+                credential: credential,
+                nvflare_path: document.getElementById('setting-nvflare-path').value,
+                python_exe: document.getElementById('setting-python-exe').value,
+                poc_workspace: document.getElementById('setting-poc-workspace').value
+            };
+            const result = await apiCall('POST', '/settings', settings);
+            showMessage(result.message || result.status, result.status !== 'ok');
+        }
+
+        // Init
+        restoreTab();
+        refreshStatus();
+        loadSettings();
+        setInterval(refreshStatus, 5000);
+    </script>
+</body>
+</html>

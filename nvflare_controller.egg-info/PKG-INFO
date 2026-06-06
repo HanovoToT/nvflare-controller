@@ -1,0 +1,107 @@
+Metadata-Version: 2.4
+Name: nvflare-controller
+Version: 1.0.0
+Summary: NVFlare Controller - Independent control panel for NVFlare Dashboard, POC, Server, and Client management
+Home-page: https://github.com/HanovoToT/nvflare-controller
+Author: HanovoToT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: flask>=2.0
+Requires-Dist: flask-cors>=3.0
+Requires-Dist: requests>=2.25
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# NVFlare Controller
+
+独立控制器，用于管理 NVFlare Dashboard、POC 环境、Server 和 Client 进程。
+
+## 功能特性
+
+- **Dashboard 管理** - 启动/停止 NVFlare Dashboard
+- **POC 环境管理** - prepare/start/stop POC 环境
+- **Server/Client 管理** - 独立启动/停止 Server 和 Client
+- **Job 提交** - 通过 REST API 提交 Job
+- **JWT 自动刷新** - 定时刷新认证 Token
+
+## 安装
+
+```bash
+cd nvflare-controller
+pip install -e .
+```
+
+## 启动
+
+```bash
+export NVFLARE_CONTROLLER_PORT=8080
+python3 -m nvflare_controller.app
+```
+
+## 访问
+
+- 控制面板: http://localhost:8080
+- API 状态: http://localhost:8080/api/v1/status
+
+## API 端点
+
+### 服务状态
+- `GET /api/v1/status` - 获取所有服务状态
+
+### Dashboard 管理
+- `POST /api/v1/dashboard/start` - 启动 Dashboard
+- `POST /api/v1/dashboard/stop` - 停止 Dashboard
+- `GET /api/v1/dashboard/status` - Dashboard 状态
+
+### POC 管理
+- `POST /api/v1/poc/prepare` - 准备 POC 环境
+- `POST /api/v1/poc/start` - 启动 POC
+- `POST /api/v1/poc/stop` - 停止 POC
+- `GET /api/v1/poc/status` - POC 状态
+
+### Server/Client 管理
+- `POST /api/v1/poc/server/start` - 启动 Server
+- `POST /api/v1/poc/server/stop` - 停止 Server
+- `POST /api/v1/poc/clients` - 添加 Client
+- `POST /api/v1/poc/clients/<name>/start` - 启动 Client
+- `POST /api/v1/poc/clients/<name>/stop` - 停止 Client
+- `POST /api/v1/poc/clients/start-n` - 启动 N 个 Client
+- `POST /api/v1/poc/clients/stop-all` - 停止所有 Client
+
+### Jobs
+- `GET /api/v1/jobs` - 获取 Job 列表
+- `POST /api/v1/jobs` - 提交 Job (multipart/form-data)
+- `GET /api/v1/jobs/<job_id>/log` - 获取 Job 日志
+- `POST /api/v1/jobs/<job_id>/abort` - 中止 Job
+
+### 设置
+- `GET /api/v1/settings` - 获取配置
+- `POST /api/v1/settings` - 保存配置
+
+## 配置
+
+配置文件位于 `~/.nvflare-controller/config.json`:
+
+```json
+{
+  "dashboard_port": 8443,
+  "credential": "admin@example.com:123456:org",
+  "nvflare_path": "/path/to/nvflare",
+  "python_exe": "/usr/bin/python3",
+  "poc_workspace": "/tmp/nvflare/poc"
+}
+```
