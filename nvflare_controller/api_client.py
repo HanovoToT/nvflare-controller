@@ -44,6 +44,10 @@ class NVFlareCLIJobClient:
         """Get POC workspace path."""
         return self.config.get("poc_workspace", "/tmp/nvflare/poc")
 
+    def get_job_storage_dir(self):
+        """Get job storage directory path."""
+        return self.config.get("job_storage_dir", "/tmp/nvflare/jobs-storage")
+
     def _prepare_env(self):
         """Prepare environment variables."""
         env = os.environ.copy()
@@ -139,27 +143,47 @@ class NVFlareCLIJobClient:
             }
 
     def list_jobs(self):
-        """List jobs using CLI."""
-        workspace = self.get_poc_workspace()
-        self._run_cli(["poc", "config", "-pw", workspace])
+        """List jobs from local storage (fast). Uses caching."""
+        import time
 
-        result = self._run_cli(["job", "list"], timeout=30)
+        # Simple cache: 2 second TTL
+        now = time.time()
+        if hasattr(self, '_jobs_cache') and self._jobs_cache_time and (now - self._jobs_cache_time) < 2:
+            return self._jobs_cache
 
-        if result["returncode"] == 0:
-            # Parse job list from output
-            jobs = []
-            lines = result["stdout"].split("\n")
-            for line in lines:
-                if line.strip() and not line.startswith("="):
-                    jobs.append({
-                        "name": line.strip(),
-                        "status": "UNKNOWN",
-                        "submit_time": ""
-                    })
-            return {"status": "ok", "jobs": jobs}
-        else:
-            # If job list fails, return empty list instead of error
-            return {"status": "ok", "jobs": [], "message": result["stderr"] or "No jobs found"}
+        jobs_storage = self.get_job_storage_dir()
+        jobs = []
+
+        if not os.path.exists(jobs_storage):
+            return {"status": "ok", "jobs": []}
+
+        try:
+            with os.scandir(jobs_storage) as entries:
+                for entry in entries:
+                    if not entry.is_dir():
+                        continue
+                    meta_file = os.path.join(entry.path, "meta")
+                    try:
+                        with open(meta_file, "r") as f:
+                            meta = json.load(f)
+                        jobs.append({
+                            "job_id": meta.get("job_id", entry.name),
+                            "name": meta.get("name", "Unknown"),
+                            "status": meta.get("status", "UNKNOWN"),
+                            "submit_time": meta.get("submit_time_iso", "")
+                        })
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        pass
+        except Exception:
+            pass
+
+        # Sort by submit_time descending
+        jobs.sort(key=lambda x: x.get("submit_time", ""), reverse=True)
+
+        # Cache result
+        self._jobs_cache = {"status": "ok", "jobs": jobs}
+        self._jobs_cache_time = now
+        return self._jobs_cache
 
     def abort_job(self, job_id):
         """"Abort a job using CLI."""
@@ -204,11 +228,23 @@ class NVFlareCLIJobClient:
 
         return {"status": "ok", "log": "No log available"}
 
+    def get_job_result(self, job_id):
+        """Get job result file path (workspace.zip)."""
+        job_result_dir = os.path.join(self.get_job_storage_dir(), job_id)
+        workspace_file = os.path.join(job_result_dir, "workspace")
+
+        if os.path.exists(workspace_file):
+            return {"status": "ok", "file_path": workspace_file}
+
+        data_file = os.path.join(job_result_dir, "data")
+        if os.path.exists(data_file):
+            return {"status": "ok", "file_path": data_file}
+
+        return {"status": "error", "message": "Job result not found"}
+
     def delete_job(self, job_id):
-        """Delete a job."""
-        # Jobs are stored in workspace, just remove the directory
-        workspace = self.get_poc_workspace()
-        job_dir = os.path.join(workspace, "example_project", "prod_00", job_id)
+        """Delete a job from job storage directory."""
+        job_dir = os.path.join(self.get_job_storage_dir(), job_id)
 
         if os.path.exists(job_dir):
             try:

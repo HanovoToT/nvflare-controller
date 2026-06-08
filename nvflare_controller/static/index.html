@@ -209,7 +209,7 @@
             <div class="card">
                 <h2>提交任务</h2>
                 <div class="form-group">
-                    <input type="file" id="job-file" accept=".zip" style="display: none;" onchange="handleJobFile(this)">
+                    <input type="file" id="job-file" accept=".zip" style="display: none;" onchange="handleJobFile()">
                     <button class="btn" onclick="document.getElementById('job-file').click()">选择 Job ZIP 文件</button>
                     <span id="selected-job-name"></span>
                     <button class="btn" id="submit-job-btn" disabled onclick="submitJob()">提交</button>
@@ -260,6 +260,12 @@
                 <div class="form-group">
                     <label>POC 工作区:</label>
                     <input type="text" id="setting-poc-workspace" placeholder="/tmp/nvflare/poc">
+                    <small style="color:#666;font-size:12px;">Windows 用户需设置为如 C:\Users\xxx\AppData\Local\Temp\nvflare\poc</small>
+                </div>
+                <div class="form-group">
+                    <label>Job 存储目录:</label>
+                    <input type="text" id="setting-job-storage-dir" placeholder="/tmp/nvflare/jobs-storage">
+                    <small style="color:#666;font-size:12px;">Windows 用户需设置为如 C:\Users\xxx\AppData\Local\Temp\nvflare\jobs-storage</small>
                 </div>
                 <button class="btn" onclick="saveSettings()">保存设置</button>
             </div>
@@ -436,6 +442,8 @@
         let selectedJobIds = [];
 
         async function refreshJobs() {
+            selectedJobIds = [];
+            document.getElementById('selected-count').textContent = '';
             const data = await apiCall('GET', '/jobs');
             const container = document.getElementById('jobs-container');
             if (data.status !== 'ok' || !data.jobs) {
@@ -449,20 +457,67 @@
             data.jobs.sort((a, b) => new Date(b.submit_time || 0) - new Date(a.submit_time || 0));
             let html = '<table class="clients-table"><thead><tr><th><input type="checkbox" onchange="toggleSelectAll(this)"></th><th>任务ID</th><th>名称</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody>';
             data.jobs.forEach(j => {
+                const isCompleted = j.status && j.status.toUpperCase().includes('COMPLETED');
                 html += '<tr>';
                 html += '<td><input type="checkbox" class="job-checkbox" value="' + j.job_id + '" onchange="updateSelectedCount()"></td>';
-                html += '<td>' + j.job_id + '</td>';
+                html += '<td style="font-size: 12px; color: #666;">' + j.job_id.substring(0, 8) + '...</td>';
                 html += '<td>' + (j.name || 'Unknown') + '</td>';
-                html += '<td>' + j.status + '</td>';
-                html += '<td>' + (j.submit_time || '-') + '</td>';
-                html += '<td><button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="viewJobLog(\'' + j.job_id + '\')">日志</button></td>';
+                html += '<td>' + formatJobStatus(j.status) + '</td>';
+                html += '<td>' + formatJobTime(j.submit_time) + '</td>';
+                html += '<td>';
+                if (isCompleted) {
+                    html += '<button class="btn" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;" onclick="exportJobResult(\'' + j.job_id + '\')">导出</button>';
+                }
+                html += '<button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="viewJobLog(\'' + j.job_id + '\')">日志</button></td>';
                 html += '</tr>';
             });
             html += '</tbody></table>';
             container.innerHTML = html;
         }
 
-        function handleJobFile(files) {
+        async function exportJobResult(jobId) {
+            window.location.href = API_BASE + '/jobs/' + jobId + '/result';
+        }
+
+        function formatJobStatus(status) {
+            if (!status) return '<span style="color: #999;">未知</span>';
+            const s = status.toUpperCase();
+            if (s.includes('FINISHED') && s.includes('COMPLETED')) {
+                return '<span style="color: green; font-weight: bold;">✓ 完成</span>';
+            }
+            if (s.includes('FINISHED') && (s.includes('FAILED') || s.includes('ERROR'))) {
+                return '<span style="color: red; font-weight: bold;">✗ 失败</span>';
+            }
+            if (s.includes('RUNNING') || s.includes('EXECUTING')) {
+                return '<span style="color: #007bff; font-weight:bold;">⟳ 运行中</span>';
+            }
+            if (s.includes('ABORT') || s.includes('STOPPED')) {
+                return '<span style="color: orange; font-weight: bold;">■ 已停止</span>';
+            }
+            if (s.includes('SUBMITTED') || s.includes('PENDING')) {
+                return '<span style="color: #666;">⏳ 已提交</span>';
+            }
+            return '<span style="color: #999;">' + status + '</span>';
+        }
+
+        function formatJobTime(timeStr) {
+            if (!timeStr) return '-';
+            try {
+                const d = new Date(timeStr);
+                return d.toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            } catch (e) {
+                return timeStr;
+            }
+        }
+
+        function handleJobFile() {
+            const files = document.getElementById('job-file').files;
             if (files.length > 0) {
                 selectedJobFile = files[0];
                 document.getElementById('selected-job-name').textContent = selectedJobFile.name;
@@ -472,6 +527,9 @@
 
         async function submitJob() {
             if (!selectedJobFile) return;
+            const btn = document.getElementById('submit-job-btn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
             const formData = new FormData();
             formData.append('job', selectedJobFile);
             try {
@@ -481,12 +539,14 @@
                 if (result.status === 'ok') {
                     selectedJobFile = null;
                     document.getElementById('selected-job-name').textContent = '';
-                    document.getElementById('submit-job-btn').disabled = true;
                     document.getElementById('job-file').value = '';
                     refreshJobs();
                 }
             } catch (e) {
                 showMessage('提交失败: ' + e.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '提交';
             }
         }
 
@@ -516,7 +576,12 @@
             if (!confirm('确定要删除 ' + ids.length + ' 个任务吗？此操作不可恢复。')) return;
             const result = await apiCall('POST', '/jobs/batch-delete', { job_ids: ids });
             showMessage(result.message || result.status, result.status !== 'ok');
-            if (result.status === 'ok') refreshJobs();
+            if (result.status === 'ok') {
+                selectedJobIds = [];
+                document.querySelectorAll('.job-checkbox').forEach(cb => cb.checked = false);
+                document.getElementById('selected-count').textContent = '';
+                refreshJobs();
+            }
         }
 
         // Settings
@@ -527,6 +592,7 @@
                 document.getElementById('setting-nvflare-path').value = data.settings.nvflare_path || '';
                 document.getElementById('setting-python-exe').value = data.settings.python_exe || '/usr/bin/python3';
                 document.getElementById('setting-poc-workspace').value = data.settings.poc_workspace || '/tmp/nvflare/poc';
+                document.getElementById('setting-job-storage-dir').value = data.settings.job_storage_dir || '/tmp/nvflare/jobs-storage';
                 // Parse credential
                 const cred = (data.settings.credential || 'admin@example.com:123456:org').split(':');
                 document.getElementById('setting-email').value = cred[0] || '';
@@ -547,7 +613,8 @@
                 credential: credential,
                 nvflare_path: document.getElementById('setting-nvflare-path').value,
                 python_exe: document.getElementById('setting-python-exe').value,
-                poc_workspace: document.getElementById('setting-poc-workspace').value
+                poc_workspace: document.getElementById('setting-poc-workspace').value,
+                job_storage_dir: document.getElementById('setting-job-storage-dir').value
             };
             const result = await apiCall('POST', '/settings', settings);
             showMessage(result.message || result.status, result.status !== 'ok');
@@ -556,8 +623,10 @@
         // Init
         restoreTab();
         refreshStatus();
+        refreshJobs();
         loadSettings();
         setInterval(refreshStatus, 5000);
+        setInterval(refreshJobs, 5000);
     </script>
 </body>
 </html>

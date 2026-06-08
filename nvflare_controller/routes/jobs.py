@@ -51,6 +51,22 @@ def get_job_log(job_id):
     return jsonify(result)
 
 
+@jobs_bp.route("/jobs/<job_id>/result", methods=["GET"])
+def get_job_result(job_id):
+    """Get job result (workspace.zip)."""
+    from flask import send_file
+    client = get_job_client()
+    result = client.get_job_result(job_id)
+    if result.get("status") == "ok" and result.get("file_path"):
+        return send_file(
+            result["file_path"],
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'job_{job_id}_result.zip'
+        )
+    return jsonify(result), 404
+
+
 @jobs_bp.route("/jobs", methods=["POST"])
 def submit_job():
     """Submit a new job (ZIP file upload)."""

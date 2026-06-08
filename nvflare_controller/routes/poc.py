@@ -23,12 +23,14 @@ poc_bp = Blueprint("poc", __name__)
 
 @poc_bp.route("/poc/prepare", methods=["POST"])
 def prepare_poc():
-    """Prepare POC environment."""
+    """Prepare POC environment and start server + clients."""
     data = request.get_json() or {}
     num_clients = data.get("num_clients", 2)
 
     pm = get_process_manager()
     result = pm.prepare_poc(num_clients)
+    if result.get("status") == "ok":
+        pm.start_poc()
     return jsonify(result)
 
 

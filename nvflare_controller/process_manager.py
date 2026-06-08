@@ -20,6 +20,7 @@ Manages Dashboard, Server, and Client subprocesses.
 import os
 import signal
 import subprocess
+import time
 from datetime import datetime
 
 from .config import get_config
@@ -184,6 +185,13 @@ class ProcessManager:
         try:
             env = self._prepare_env()
 
+            # Kill existing server/client processes first
+            subprocess.run(["pkill", "-f", "fed_server.json"], capture_output=True, text=True)
+            subprocess.run(["pkill", "-f", "fed_client.json"], capture_output=True, text=True)
+            subprocess.run(["pkill", "-f", "server_train"], capture_output=True, text=True)
+            subprocess.run(["pkill", "-f", "client_train"], capture_output=True, text=True)
+            time.sleep(1)
+
             # Config workspace
             config_cmd = [python_exe, "-m", "nvflare.cli", "poc", "config", "-pw", workspace]
             subprocess.run(config_cmd, capture_output=True, text=True, env=env)
@@ -198,31 +206,13 @@ class ProcessManager:
 
     def stop_poc(self):
         """Stop POC (server + all clients)."""
-        python_exe = self.get_python_exe()
-        workspace = self.get_poc_workspace()
-
         try:
-            env = self._prepare_env()
-
-            # First stop all clients
+            # Kill all server/client processes
+            subprocess.run(["pkill", "-f", "fed_server.json"], capture_output=True, text=True)
             subprocess.run(["pkill", "-f", "fed_client.json"], capture_output=True, text=True)
-
-            # Stop server
-            server_dir = os.path.join(workspace, "example_project", "prod_00", "server")
-            pid_file = os.path.join(server_dir, "pid.fl")
-            if os.path.exists(pid_file):
-                try:
-                    with open(pid_file, "r") as f:
-                        pid = int(f.read().strip())
-                    if pid and self.is_process_alive(pid):
-                        os.kill(pid, signal.SIGTERM)
-                except Exception:
-                    pass
-
-            # Then stop POC
-            cmd = [python_exe, "-m", "nvflare.cli", "poc", "stop", "--no-wait"]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
-
+            subprocess.run(["pkill", "-f", "server_train"], capture_output=True, text=True)
+            subprocess.run(["pkill", "-f", "client_train"], capture_output=True, text=True)
+            time.sleep(1)
             return {"status": "ok", "message": "POC stopping"}
         except Exception as e:
             return {"status": "error", "message": str(e)}

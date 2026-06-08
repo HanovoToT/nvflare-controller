@@ -25,7 +25,10 @@ DEFAULT_CONFIG = {
     "credential": "admin@example.com:123456:org",
     "nvflare_path": "",
     "python_exe": "/usr/bin/python3",
-    "poc_workspace": "/tmp/nvflare/poc"
+    # 默认路径: macOS/Linux 使用 /tmp/nvflare/xxx
+    # Windows 用户需手动设置为: C:\Users\<用户名>\AppData\Local\Temp\nvflare\xxx
+    "poc_workspace": "/tmp/nvflare/poc",
+    "job_storage_dir": "/tmp/nvflare/jobs-storage"
 }
 
 
